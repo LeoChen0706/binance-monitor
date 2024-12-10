@@ -37,6 +37,7 @@ def check_announcements(bot_token, chat_id):
 def main():
     bot_token = os.environ['TELEGRAM_BOT_TOKEN']
     chat_id = os.environ['TELEGRAM_CHAT_ID']
+    send_notification(bot_token, chat_id, "Test", "Bot is running successfully!")
     check_announcements(bot_token, chat_id)
 
 if __name__ == "__main__":
