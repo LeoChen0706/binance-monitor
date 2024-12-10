@@ -17,15 +17,6 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: '3.9'
-    
-    - name: Debug directory
-      run: |
-        echo "Current directory:"
-        pwd
-        echo "Directory contents:"
-        ls -la
-        echo "Full path search for monitor.py:"
-        find / -name monitor.py 2>/dev/null
         
     - name: Install dependencies
       run: |
@@ -36,4 +27,5 @@ jobs:
       env:
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      working-directory: ./binance-monitor  # Add this line
       run: python monitor.py
