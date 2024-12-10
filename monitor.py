@@ -35,8 +35,8 @@ def check_announcements(bot_token, chat_id):
         send_notification(bot_token, chat_id, "Monitor Error", f"Error checking announcements: {str(e)}")
 
 def main():
-    bot_token = os.environ['7575222208:AAEyajhnvd_9j72wQpRZFs129JgHvuDGtjM']
-    chat_id = os.environ['1366620678']
+    bot_token = os.environ['TELEGRAM_BOT_TOKEN']
+    chat_id = os.environ['TELEGRAM_CHAT_ID']
     check_announcements(bot_token, chat_id)
 
 if __name__ == "__main__":
