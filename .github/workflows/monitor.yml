@@ -2,25 +2,30 @@ name: Monitor Binance Announcements
 
 on:
   schedule:
-    - cron: '*/5 * * * *'  # Runs every 5 minutes
-  workflow_dispatch:  # Allows manual triggering
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
 
 jobs:
   check-announcements:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v3
-    
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.9'
     
+    - name: List directory contents
+      run: ls -la
+      
     - name: Install dependencies
       run: |
-        pip install -r $GITHUB_WORKSPACE/requirements.txt
-    
+        python -m pip install --upgrade pip
+        pip install requests beautifulsoup4 python-telegram-bot
+
     - name: Run monitor
       env:
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
