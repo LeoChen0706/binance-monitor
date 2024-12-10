@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import telegram
 import os
+from datetime import datetime
 
 def send_notification(bot_token, chat_id, title, link):
     """Send notification via Telegram"""
@@ -21,15 +22,23 @@ def check_announcements(bot_token, chat_id):
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Find announcement elements
         announcements = soup.select('.announcement-item')
+        found_delisting = False
         
         for announcement in announcements:
             title = announcement.select_one('.title').text.strip()
             link = announcement.select_one('a')['href']
             
             if 'delist' in title.lower():
+                found_delisting = True
                 send_notification(bot_token, chat_id, title, link)
+        
+        # Send status update even if no delisting found
+        bot = telegram.Bot(token=bot_token)
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        status_message = f"✅ Check completed at {current_time}\n"
+        status_message += "No new delisting announcements found" if not found_delisting else "Delisting notifications sent above"
+        bot.send_message(chat_id=chat_id, text=status_message)
                 
     except Exception as e:
         send_notification(bot_token, chat_id, "Monitor Error", f"Error checking announcements: {str(e)}")
@@ -37,7 +46,6 @@ def check_announcements(bot_token, chat_id):
 def main():
     bot_token = os.environ['TELEGRAM_BOT_TOKEN']
     chat_id = os.environ['TELEGRAM_CHAT_ID']
-    send_notification(bot_token, chat_id, "Test", "Bot is running successfully!")
     check_announcements(bot_token, chat_id)
 
 if __name__ == "__main__":
