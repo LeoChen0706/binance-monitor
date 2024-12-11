@@ -49,8 +49,8 @@ async def check_announcements():
             title_element = announcement.select_one('[class*="title"]') or announcement
             title = title_element.get_text().strip()
             
-            # Only process if it's a delisting announcement
-            if 'delist' in title.lower():
+            # Only process if it's a specific delisting announcement
+            if title.startswith('Binance Will Delist'):
                 link_element = announcement if announcement.name == 'a' else announcement.find_parent('a')
                 link = link_element.get('href', '') if link_element else ''
                 
