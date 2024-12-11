@@ -64,7 +64,7 @@ async def check_announcements():
         # Only send status message if there's an error or delisting found
         if found_delisting:
             current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            await send_message(bot, chat_id, f"⚠️ Please check the delisting announcements carefully! Time: {current_time}")
+            await send_message(bot, chat_id, f"⚠️ Please check the delisting announcements carefully!")
                 
     except Exception as e:
         error_message = f"⚠️ Error checking announcements: {str(e)}"
