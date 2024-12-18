@@ -20,30 +20,44 @@ async def check_announcements():
         chat_id = os.environ['TELEGRAM_CHAT_ID']
         bot = telegram.Bot(token=bot_token)
 
-        # Binance API endpoint for announcements
-        url = "https://www.binance.com/bapi/composite/v1/public/cms/article/list/query"
+        # Direct data endpoint
+        url = "https://www.binance.com/gateway-api/v1/public/cms/article/list/query"
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'content-type': 'application/json'
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/json",
+            "bnc-uuid": "web_" + str(int(datetime.now().timestamp() * 1000)),
+            "clienttype": "web",
+            "lang": "en"
         }
-        payload = {
+        
+        params = {
             "type": "1",
-            "pageSize": 20,
-            "pageNo": 1,
+            "pageNo": "1",
+            "pageSize": "20",
             "catalogId": "161"
         }
         
-        response = requests.post(url, json=payload, headers=headers)
+        response = requests.get(url, headers=headers, params=params)
         response.raise_for_status()
         
-        data = response.json()
-        found_delisting = False
-        
-        if 'data' in data and 'catalogs' in data['data']:
-            announcements = data['data']['catalogs']
+        if response.status_code != 200:
+            print(f"Got status code: {response.status_code}")
+            print(f"Response: {response.text[:200]}")
+            return
+
+        try:
+            data = response.json()
+        except Exception as e:
+            print(f"Failed to parse JSON: {str(e)}")
+            print(f"Raw response: {response.text[:200]}")
+            return
+
+        if 'data' in data and 'articles' in data['data']:
+            announcements = data['data']['articles']
             
             for announcement in announcements:
                 title = announcement.get('title', '').strip()
+                print(f"Found announcement: {title}")  # Debug print
                 
                 if title.startswith('Binance Will Delist'):
                     code = announcement.get('code', '')
@@ -51,18 +65,14 @@ async def check_announcements():
                     
                     message = f"🚨 New Delisting Announcement 🚨\n\nTitle: {title}\nLink: {link}"
                     await send_message(bot, chat_id, message)
-                    found_delisting = True
-        
-            # Only send status message if delisting found
-            if found_delisting:
-                current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                await send_message(bot, chat_id, f"⚠️ Please check the delisting announcements carefully!")
-                
+        else:
+            print("Unexpected data structure:", data.keys())
+
     except Exception as e:
-        error_message = f"⚠️ Error checking announcements: {str(e)}"
-        if 'bot' in locals() and 'chat_id' in locals():
-            await send_message(bot, chat_id, error_message)
-        print(error_message)
+        print(f"Error occurred: {str(e)}")
+        if 'response' in locals():
+            print(f"Response status: {response.status_code}")
+            print(f"Response text: {response.text[:200]}")
         raise e
 
 async def main():
