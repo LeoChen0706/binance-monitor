@@ -1,9 +1,13 @@
-import requests
-from bs4 import BeautifulSoup
-import telegram
 import os
 import asyncio
+import telegram
 from datetime import datetime
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import time
 
 async def send_message(bot, chat_id, message):
     """Helper function to send messages"""
@@ -14,63 +18,70 @@ async def send_message(bot, chat_id, message):
     )
 
 async def check_announcements():
-    """Check for new delisting announcements"""
+    """Check for new delisting announcements using Selenium"""
     try:
         # Get credentials
         bot_token = os.environ['TELEGRAM_BOT_TOKEN']
         chat_id = os.environ['TELEGRAM_CHAT_ID']
         bot = telegram.Bot(token=bot_token)
 
-        # Binance delisting announcement URL
-        url = "https://www.binance.com/en/support/announcement/delisting?c=161&navId=161"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.5"
-        }
+        # Setup Chrome options
+        chrome_options = Options()
+        chrome_options.add_argument('--headless')  # Run in headless mode
+        chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument('--disable-dev-shm-usage')
         
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
+        # Initialize the driver
+        driver = webdriver.Chrome(options=chrome_options)
+        print("Browser initialized")
         
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # Try multiple possible selectors for announcements
-        announcements = (
-            soup.select('.css-1wr4jig') or
-            soup.select('.announcement-item') or
-            soup.select('div[class*="announcement"]') or
-            soup.select('a[href*="/support/announcement"]')
-        )
-        
-        found_delisting = False
-        
-        for announcement in announcements:
-            # Get title and link
-            title_element = announcement.select_one('[class*="title"]') or announcement
-            title = title_element.get_text().strip()
+        try:
+            # Navigate to the page
+            url = "https://www.binance.com/en/support/announcement/delisting?c=161&navId=161"
+            print(f"Navigating to {url}")
+            driver.get(url)
             
-            # Only process if it's a specific delisting announcement
-            if title.startswith('Binance Will Delist'):
-                link_element = announcement if announcement.name == 'a' else announcement.find_parent('a')
-                link = link_element.get('href', '') if link_element else ''
+            # Wait for announcements to load
+            print("Waiting for announcements to load...")
+            WebDriverWait(driver, 20).until(
+                EC.presence_of_element_located((By.CLASS_NAME, "css-1wr4jig"))
+            )
+            
+            # Let the page fully load
+            time.sleep(5)
+            
+            # Find all announcements
+            announcements = driver.find_elements(By.CLASS_NAME, "css-1wr4jig")
+            print(f"Found {len(announcements)} announcements")
+            
+            found_delisting = False
+            for announcement in announcements:
+                try:
+                    title = announcement.text.strip()
+                    print(f"Found announcement: {title}")
+                    
+                    if title.startswith("Binance Will Delist"):
+                        link = announcement.find_element(By.TAG_NAME, "a").get_attribute("href")
+                        message = f"🚨 New Delisting Announcement 🚨\n\nTitle: {title}\nLink: {link}"
+                        await send_message(bot, chat_id, message)
+                        found_delisting = True
+                        print(f"Sent notification for: {title}")
+                except Exception as e:
+                    print(f"Error processing announcement: {str(e)}")
+                    continue
+            
+            if not found_delisting:
+                print("No new delisting announcements found")
                 
-                if not link.startswith('http'):
-                    link = 'https://www.binance.com' + link
+        finally:
+            driver.quit()
+            print("Browser closed")
 
-                message = f"🚨 New Delisting Announcement 🚨\n\nTitle: {title}\nLink: {link}"
-                await send_message(bot, chat_id, message)
-                found_delisting = True
-        
-        # Only send status message if there's an error or delisting found
-        if found_delisting:
-            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            await send_message(bot, chat_id, f"⚠️ Please check the delisting announcements carefully!")
-                
     except Exception as e:
         error_message = f"⚠️ Error checking announcements: {str(e)}"
+        print(error_message)
         if 'bot' in locals() and 'chat_id' in locals():
             await send_message(bot, chat_id, error_message)
-        print(error_message)
         raise e
 
 async def main():
