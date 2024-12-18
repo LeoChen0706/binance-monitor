@@ -3,6 +3,7 @@ import telegram
 import os
 import asyncio
 from datetime import datetime
+import json
 
 async def send_message(bot, chat_id, message):
     """Helper function to send messages"""
@@ -20,44 +21,54 @@ async def check_announcements():
         chat_id = os.environ['TELEGRAM_CHAT_ID']
         bot = telegram.Bot(token=bot_token)
 
-        # Direct data endpoint
-        url = "https://www.binance.com/gateway-api/v1/public/cms/article/list/query"
+        # V2 API endpoint
+        url = "https://www.binance.com/api/v2/cms/public-info/get-list"
+        
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept": "application/json",
-            "bnc-uuid": "web_" + str(int(datetime.now().timestamp() * 1000)),
-            "clienttype": "web",
-            "lang": "en"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "*/*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Referer": "https://www.binance.com/en/support/announcement/delisting",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-origin",
+            "Pragma": "no-cache"
         }
         
         params = {
-            "type": "1",
+            "catalogId": "161",
             "pageNo": "1",
-            "pageSize": "20",
-            "catalogId": "161"
+            "pageSize": "20"
         }
         
-        response = requests.get(url, headers=headers, params=params)
-        response.raise_for_status()
+        print("Making request to Binance...")
+        session = requests.Session()
+        # First get the main page to get any necessary cookies
+        session.get("https://www.binance.com/en/support/announcement/delisting", headers=headers)
         
-        if response.status_code != 200:
-            print(f"Got status code: {response.status_code}")
-            print(f"Response: {response.text[:200]}")
-            return
-
+        # Then make the API request
+        response = session.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        print(f"Got response: {response.status_code}")
+        
         try:
             data = response.json()
-        except Exception as e:
+            print("Successfully parsed JSON response")
+        except json.JSONDecodeError as e:
             print(f"Failed to parse JSON: {str(e)}")
-            print(f"Raw response: {response.text[:200]}")
+            print(f"Response text: {response.text[:200]}")
             return
 
-        if 'data' in data and 'articles' in data['data']:
-            announcements = data['data']['articles']
+        if 'data' in data and isinstance(data['data'], list):
+            announcements = data['data']
+            print(f"Found {len(announcements)} announcements")
             
             for announcement in announcements:
                 title = announcement.get('title', '').strip()
-                print(f"Found announcement: {title}")  # Debug print
+                print(f"Checking announcement: {title}")
                 
                 if title.startswith('Binance Will Delist'):
                     code = announcement.get('code', '')
@@ -65,14 +76,18 @@ async def check_announcements():
                     
                     message = f"🚨 New Delisting Announcement 🚨\n\nTitle: {title}\nLink: {link}"
                     await send_message(bot, chat_id, message)
+                    print(f"Sent notification for: {title}")
         else:
-            print("Unexpected data structure:", data.keys())
+            print(f"Unexpected data structure. Keys: {data.keys() if isinstance(data, dict) else 'Not a dict'}")
 
     except Exception as e:
-        print(f"Error occurred: {str(e)}")
+        error_message = f"⚠️ Error checking announcements: {str(e)}"
+        print(error_message)
         if 'response' in locals():
-            print(f"Response status: {response.status_code}")
-            print(f"Response text: {response.text[:200]}")
+            print(f"Response status: {getattr(response, 'status_code', 'N/A')}")
+            print(f"Response text: {getattr(response, 'text', 'N/A')[:200]}")
+        if 'bot' in locals() and 'chat_id' in locals():
+            await send_message(bot, chat_id, error_message)
         raise e
 
 async def main():
