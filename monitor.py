@@ -21,6 +21,10 @@ async def check_announcements():
         chat_id = os.environ['TELEGRAM_CHAT_ID']
         bot = telegram.Bot(token=bot_token)
 
+        # Send debug start message
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        await send_message(bot, chat_id, f"🔍 Debug: Starting check at {current_time}")
+
         # Binance delisting announcement URL
         url = "https://www.binance.com/en/support/announcement/delisting?c=161&navId=161"
         headers = {
@@ -42,12 +46,18 @@ async def check_announcements():
             soup.select('a[href*="/support/announcement"]')
         )
         
+        # Debug: Print number of announcements found
+        await send_message(bot, chat_id, f"Debug: Found {len(announcements)} total announcements")
+        
         found_delisting = False
         
         for announcement in announcements:
             # Get title and link
             title_element = announcement.select_one('[class*="title"]') or announcement
             title = title_element.get_text().strip()
+            
+            # Debug: Print each title found
+            await send_message(bot, chat_id, f"Debug: Found title: {title}")
             
             # Only process if it's a specific delisting announcement
             if title.startswith('Binance Will Delist'):
@@ -61,10 +71,8 @@ async def check_announcements():
                 await send_message(bot, chat_id, message)
                 found_delisting = True
         
-        # Only send status message if there's an error or delisting found
-        if found_delisting:
-            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            await send_message(bot, chat_id, f"⚠️ Please check the delisting announcements carefully!")
+        # Send completion message
+        await send_message(bot, chat_id, f"Debug: Check completed. Found delisting: {found_delisting}")
                 
     except Exception as e:
         error_message = f"⚠️ Error checking announcements: {str(e)}"
